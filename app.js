@@ -11,6 +11,21 @@ var budgetController = (function() {
         this.perc = perc;
     };
 
+    // we are modifying and object's property perc here, so it's best to build this object's method and call it on each object we'll have in the array
+    Expense.prototype.calcPerc = function() {
+        calculateTotal('exp');
+        this.perc = Math.round(this.value / data.totals.exp * 100);
+    }
+
+    Expense.prototype.freshPerc = function() {
+        var targ, parentDOM, element;
+        targ = UIController.getDomStrings();
+        parentDOM = document.getElementById('exp-' + this.id);
+        element = parentDOM.childNodes[3].childNodes[3]; // refactoring required - now childNodes are harcoded - need to replace that with dynamic loop over array of nodes
+        element.textContent = this.perc + '%';
+    }
+    
+
     var Income = function(id,description,value) {
         this.id = id;
         this.description = description;
@@ -70,6 +85,13 @@ var budgetController = (function() {
             return newItem;
         },
 
+        updatePerc: function() {
+            // calculate and return % of total expenses
+            data.allItems.exp.forEach(function(current) {
+                current.calcPerc();
+            })
+        },
+
         deleteItem: function(type,id) {
             var ids, index;
 
@@ -123,6 +145,10 @@ var budgetController = (function() {
             } 
         },
 
+        getExp: function() {
+            return data.allItems.exp;
+        },
+
         testing: function() {
             console.log(data);
         }
@@ -147,7 +173,8 @@ var UIController = (function() {
         expenseDisplay: '.budget__expenses--value',
         incomeDisplay: '.budget__income--value',
         percDisplay: '.budget__expenses--percentage',
-        budgetDisplay: '.budget__value'
+        budgetDisplay: '.budget__value',
+        itemPerc: '.item__percentage'
         
     }
 
@@ -156,10 +183,17 @@ var UIController = (function() {
             return {
                 type: document.querySelector(DOMstrings.inputType).value, // either inc or exp
                 description: document.querySelector(DOMstrings.inputDescription).value,
-                value: parseFloat(document.querySelector(DOMstrings.inputValue).value)
+                value: parseFloat(document.querySelector(DOMstrings.inputValue).value),
+                perc: function() {
+                    var budget, perc;
+                    budget = budgetController.getBudget();
+                    var totExp = this.value + budget.expenses; // calculate total expenses upon program start
+                    perc = Math.round((this.value / totExp) * 100);
+                    return perc;
+                }
             }
         },
-
+        
         addListItem: function(obj, type, perc) {
             var html, newHtml, element;
             
@@ -187,26 +221,17 @@ var UIController = (function() {
             document.querySelector(element).insertAdjacentHTML('beforeend', newHtml);
         },
 
-        updatePerc: function(obj) {
-            // calculate and return % of total expenses
-            var budget, perc;
-            budget = budgetController.getBudget();
-
-            var totExp = obj.value + budget.expenses; // calculate total expenses upon program start
-
-            perc = Math.round((obj.value / totExp) * 100);
-
-            return perc;
-        },
-
-        updateListPerc: function() {
+        updateListPerc: function(list) {
             // loop over array of list items and update their %
+            list.forEach(function(current) {
+                current.freshPerc();
+            });
         },
 
         deleteListItem: function(selectorID) {
 
             var el = document.getElementById(selectorID);
-            el.parentNode.removeChild(el); // in JavaScript you canonly delete a child element, so we had totraverse the DOM up from income-x to it's parent and then remove it's child - which is the income-x element
+            el.parentNode.removeChild(el); // in JavaScript you can only delete a child element, so we had totraverse the DOM up from income-x to it's parent and then remove it's child - which is the income-x element
         },
 
         getListItem: function () {
@@ -292,31 +317,37 @@ var controller = (function(budgetCtrl, UICtrl) { //actual names of the other two
         budgetCtrl.calculateBudget();
         // 2. return the budget
         var budget = budgetCtrl.getBudget();
-        console.log('update budget', budget.expenses)
+
         // 3. Display the budget on the UI
         UICtrl.displayBudget(budget);
+
+        // 4. Calculate and update % of all expenses for all present expenses
+        budgetCtrl.updatePerc();
     };
 
     var ctrlAddItem = function() {
-        var input, newItem, perc;
+        var input, newItem, list;
 
         // 1. Get the field input data
         input = UICtrl.getInput();
 
             if (input.description !== "" && !isNaN(input.value) && input.value > 0) {
                 // 2. Add item to budget controler
-                newItem = budgetController.addItem(input.type, input.description, input.value, perc);
+                newItem = budgetController.addItem(input.type, input.description, input.value, input.perc());
+  
 
                 // 3. Add the item to the UI
-
-                perc = UIController.updatePerc(newItem);
-                UIController.addListItem(newItem, input.type, perc);
+                UIController.addListItem(newItem, input.type, input.perc());
 
                 // 4. Clear the fields
                 UIController.clearFields();
                 
                 //5. Calculate and update budget
                 updateBudget();
+
+                //6. Update item %
+                list = budgetCtrl.getExp();
+                UICtrl.updateListPerc(list);
         }
     
     };
@@ -342,6 +373,9 @@ var controller = (function(budgetCtrl, UICtrl) { //actual names of the other two
         // 3. Re-calculate the budget & 4. Update the UI
         updateBudget();
         
+        // 4. Update % of total exp on the UI for entire list
+        list = budgetCtrl.getExp();
+        UICtrl.updateListPerc(list);
 
     };
 
