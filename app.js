@@ -234,12 +234,6 @@ var UIController = (function() {
             el.parentNode.removeChild(el); // in JavaScript you can only delete a child element, so we had totraverse the DOM up from income-x to it's parent and then remove it's child - which is the income-x element
         },
 
-        getListItem: function () {
-            return {
-                type: document.querySelector()
-            }
-        },
-
         clearFields: function(){
 
             // select all fields that need to be cleared and store them into a variable
